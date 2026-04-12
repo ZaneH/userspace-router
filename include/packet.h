@@ -22,9 +22,9 @@ typedef struct {
 } IPHeader;
 
 typedef struct {
-  uint32_t dst;
-  uint32_t src;
-  uint8_t type;
+  uint8_t dst[6];
+  uint8_t src[6];
+  uint16_t type;
 } EthernetFrame;
 
 #endif // INCLUDE_INCLUDE_PACKET_H_

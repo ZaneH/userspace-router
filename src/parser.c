@@ -1,6 +1,16 @@
 #include "../include/packet.h"
 #include <arpa/inet.h>
 #include <stddef.h>
+#include <string.h>
+
+int parse_ethframe(const uint8_t *data, EthernetFrame *out) {
+  memcpy(out->dst, data, 6);
+  memcpy(out->src, data + 6, 6);
+
+  out->type = data[12] << 8 | data[13];
+
+  return 0;
+}
 
 int parse_ipv4(const uint8_t *data, size_t len, IPHeader *out) {
   if (len < 20)
