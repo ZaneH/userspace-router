@@ -4,6 +4,11 @@
 #include <stdio.h>
 #include <string.h>
 
+void print_mac(const uint8_t mac[6]) {
+  printf("%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3],
+         mac[4], mac[5]);
+}
+
 int main(int argc, char *argv[]) {
   char *filename = "./captures/google-hn.pcap";
   char errbuf[PCAP_ERRBUF_SIZE];
@@ -21,30 +26,38 @@ int main(int argc, char *argv[]) {
   printf("Read a packet with length of [%d]\n", header.len);
 
   const uint8_t *eth = packet;
-  uint16_t ethertype = (eth[12] << 8) | eth[13];
 
-  if (ethertype != 0x0800) {
+  EthernetFrame ef;
+  parse_ethframe(eth, &ef);
+
+  printf("=== EthernetFrame ===========================\n");
+  printf("Dst: ");
+  print_mac(ef.dst);
+  printf("\nSrc: ");
+  print_mac(ef.src);
+  printf("\nType: 0x%04x\n", ef.type);
+
+  if (ef.type != 0x0800)
     return 1;
-  }
 
-  const uint8_t *ip = packet + 14;
+  const uint8_t *ipv4_data = packet + 14;
 
-  IPHeader parsed;
-  parse_ipv4(ip, header.len - 14, &parsed);
+  IPHeader ipv4;
+  parse_ipv4(ipv4_data, header.len - 14, &ipv4);
 
   printf("=== IPv4 ===========================\n");
-  printf("Version: %d\n", parsed.version);
-  printf("IHL: %d\n", parsed.ihl);
-  printf("DSCP: %d\n", parsed.dscp);
-  printf("ECN: %d\n", parsed.ecn);
-  printf("Total Length: %d\n", parsed.total_length);
-  printf("Identification: %d\n", parsed.identification);
-  printf("Flags: 0x%x\n", parsed.flags);
-  printf("TTL: %d\n", parsed.ttl);
-  printf("Protocol: %d\n", parsed.protocol);
-  printf("Checksum: 0x%x\n", parsed.checksum);
-  printf("Src: 0x%x\n", parsed.src);
-  printf("Dst: 0x%x\n", parsed.dst);
+  printf("Version: %d\n", ipv4.version);
+  printf("IHL: %d\n", ipv4.ihl);
+  printf("DSCP: %d\n", ipv4.dscp);
+  printf("ECN: %d\n", ipv4.ecn);
+  printf("Total Length: %d\n", ipv4.total_length);
+  printf("Identification: %d\n", ipv4.identification);
+  printf("Flags: 0x%x\n", ipv4.flags);
+  printf("TTL: %d\n", ipv4.ttl);
+  printf("Protocol: %d\n", ipv4.protocol);
+  printf("Checksum: 0x%x\n", ipv4.checksum);
+  printf("Src: 0x%x\n", ipv4.src);
+  printf("Dst: 0x%x\n", ipv4.dst);
 
   pcap_close(handle);
 
