@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
   const u_char *packet;
 
   packet = pcap_next(handle, &header);
-  printf("Jacked a packet with length of [%d]\n", header.len);
+  printf("Read a packet with length of [%d]\n", header.len);
 
   const uint8_t *eth = packet;
   uint16_t ethertype = (eth[12] << 8) | eth[13];
@@ -32,9 +32,19 @@ int main(int argc, char *argv[]) {
   IPHeader parsed;
   parse_ipv4(ip, header.len - 14, &parsed);
 
+  printf("=== IPv4 ===========================\n");
   printf("Version: %d\n", parsed.version);
   printf("IHL: %d\n", parsed.ihl);
+  printf("DSCP: %d\n", parsed.dscp);
+  printf("ECN: %d\n", parsed.ecn);
+  printf("Total Length: %d\n", parsed.total_length);
   printf("Identification: %d\n", parsed.identification);
+  printf("Flags: 0x%x\n", parsed.flags);
+  printf("TTL: %d\n", parsed.ttl);
+  printf("Protocol: %d\n", parsed.protocol);
+  printf("Checksum: 0x%x\n", parsed.checksum);
+  printf("Src: 0x%x\n", parsed.src);
+  printf("Dst: 0x%x\n", parsed.dst);
 
   pcap_close(handle);
 
