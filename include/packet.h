@@ -10,7 +10,7 @@ typedef struct {
   uint8_t ecn;
   uint16_t total_length;
   uint16_t identification;
-  uint8_t flags;
+  uint16_t flags;
   uint16_t fragment_offset;
   uint8_t ttl;
   uint8_t protocol;
