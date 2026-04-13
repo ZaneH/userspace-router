@@ -1,8 +1,13 @@
+#include "../include/parser.h"
 #include "../include/packet.h"
 #include <arpa/inet.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+
+const int kIPHeaderSize = 14;
+const int kTCPHeaderSize = 20;
+const int kUDPHeaderSize = 8;
 
 int parse_ethframe(const uint8_t *data, EthernetFrame *out) {
   memcpy(out->dst, data, 6);
@@ -54,7 +59,7 @@ int parse_tcp(const uint8_t *data, size_t total_length, TCPHeader *out) {
   out->checksum = data[16] << 8 | data[17];
   out->urgent_pointer = data[18] << 8 | data[19];
 
-  size_t payload_size = total_length - 20 - (out->hdr_len * 4);
+  size_t payload_size = total_length - kTCPHeaderSize - (out->hdr_len * 4);
   out->payload = malloc(payload_size);
   out->payload_size = payload_size;
   memcpy(out->payload, data + 32, payload_size);
@@ -67,6 +72,6 @@ int parse_udp(const uint8_t *data, UDPHeader *out) {
   out->length = data[4] << 8 | data[5];
   out->checksum = data[6] << 8 | data[7];
   out->payload = malloc(out->length);
-  memcpy(out->payload, data + 8, out->length - 8); // TODO: Why - 8?
+  memcpy(out->payload, data + kUDPHeaderSize, out->length - kUDPHeaderSize);
   return 0;
 }
