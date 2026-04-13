@@ -51,8 +51,9 @@ int main(int argc, char *argv[]) {
   printf("DSCP: %d\n", ipv4.dscp);
   printf("ECN: %d\n", ipv4.ecn);
   printf("Total Length: %d\n", ipv4.total_length);
-  printf("Identification: %d\n", ipv4.identification);
+  printf("Identification: 0x%04x\n", ipv4.identification);
   printf("Flags: 0x%x\n", ipv4.flags);
+  printf("Fragment Offset: 0x%x\n", ipv4.fragment_offset);
   printf("TTL: %d\n", ipv4.ttl);
   printf("Protocol: %d\n", ipv4.protocol);
   printf("Checksum: 0x%x\n", ipv4.checksum);
