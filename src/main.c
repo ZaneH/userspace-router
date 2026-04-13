@@ -86,6 +86,8 @@ int main(int argc, char *argv[]) {
     printf("Payload:\n");
     print_payload(tcp.payload, tcp.payload_size);
     printf("\n");
+
+    free(tcp.payload);
   } else if (ipv4.protocol == IPPROTO_UDP) {
     const uint8_t *udp_data = ipv4_data + ipv4.ihl * 4;
 
