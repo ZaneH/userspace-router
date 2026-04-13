@@ -1,4 +1,3 @@
-#include "../include/packet.h"
 #include "../include/parser.h"
 #include <pcap/pcap.h>
 #include <stdio.h>
@@ -47,10 +46,10 @@ int main(int argc, char *argv[]) {
   if (ef.type != 0x0800)
     return 1;
 
-  const uint8_t *ipv4_data = packet + 14;
+  const uint8_t *ipv4_data = packet + kIPHeaderSize;
 
   IPHeader ipv4;
-  parse_ipv4(ipv4_data, header.len - 14, &ipv4);
+  parse_ipv4(ipv4_data, header.len - kIPHeaderSize, &ipv4);
 
   printf("=== IPv4 ===========================\n");
   printf("Version: %d\n", ipv4.version);
@@ -99,7 +98,7 @@ int main(int argc, char *argv[]) {
     printf("Length: %d\n", udp.length);
     printf("Checksum: 0x%04x\n", udp.checksum);
     printf("Payload:\n");
-    print_payload(udp.payload, udp.length - 8); // TODO: Why - 8?
+    print_payload(udp.payload, udp.length - kUDPHeaderSize);
     printf("\n");
 
     free(udp.payload);

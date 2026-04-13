@@ -1,5 +1,5 @@
-#ifndef INCLUDE_INCLUDE_PACKET_H_
-#define INCLUDE_INCLUDE_PACKET_H_
+#ifndef INCLUDE_PACKET_H_
+#define INCLUDE_PACKET_H_
 
 #include <pcap/pcap.h>
 
@@ -50,4 +50,4 @@ typedef struct {
   uint8_t *payload;
 } UDPHeader;
 
-#endif // INCLUDE_INCLUDE_PACKET_H_
+#endif // INCLUDE_PACKET_H_
