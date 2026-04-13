@@ -6,10 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-const int kIPHeaderSize = 14;
-const int kTCPHeaderSize = 20;
-const int kUDPHeaderSize = 8;
-
 int parse_pcap_file(const char *filename) {
   char errbuf[PCAP_ERRBUF_SIZE];
   pcap_t *handle = pcap_open_offline(filename, errbuf);
@@ -34,10 +30,10 @@ int parse_pcap_file(const char *filename) {
   if (ef.type != 0x0800)
     return 3;
 
-  const uint8_t *ipv4_data = packet + kIPHeaderSize;
+  const uint8_t *ipv4_data = packet + SIZE_ETHERNET;
 
   IPHeader ipv4;
-  parse_ipv4(ipv4_data, header.len - kIPHeaderSize, &ipv4);
+  parse_ipv4(ipv4_data, header.len - SIZE_ETHERNET, &ipv4);
   print_ipv4(&ipv4);
 
   if (ipv4.protocol == IPPROTO_TCP) {
@@ -113,7 +109,7 @@ int parse_tcp(const uint8_t *data, size_t total_length, TCPHeader *out) {
   out->checksum = data[16] << 8 | data[17];
   out->urgent_pointer = data[18] << 8 | data[19];
 
-  size_t payload_size = total_length - kTCPHeaderSize - (out->hdr_len * 4);
+  size_t payload_size = total_length - SIZE_TCP - (out->hdr_len * 4);
   out->payload = malloc(payload_size);
   out->payload_size = payload_size;
   memcpy(out->payload, data + 32, payload_size);
@@ -126,6 +122,6 @@ int parse_udp(const uint8_t *data, UDPHeader *out) {
   out->length = data[4] << 8 | data[5];
   out->checksum = data[6] << 8 | data[7];
   out->payload = malloc(out->length);
-  memcpy(out->payload, data + kUDPHeaderSize, out->length - kUDPHeaderSize);
+  memcpy(out->payload, data + SIZE_UDP, out->length - SIZE_UDP);
   return 0;
 }
