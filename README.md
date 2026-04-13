@@ -10,3 +10,11 @@ cd userspace-router
 just build
 ./out
 ```
+
+## Todo
+
+- [x] Parsing
+- [ ] Routing
+    - [ ] Multi-threading
+- [ ] Forwarding
+- [ ] Optimizing
