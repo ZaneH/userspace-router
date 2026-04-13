@@ -14,6 +14,7 @@ just build
 ## Todo
 
 - [x] Parsing
+  - [x] TCP/UDP
 - [ ] Routing
     - [ ] Multi-threading
 - [ ] Forwarding

@@ -1,4 +1,5 @@
 #include "../include/parser.h"
+#include "../include/helper.h"
 #include "../include/packet.h"
 #include <arpa/inet.h>
 #include <stddef.h>
@@ -8,6 +9,59 @@
 const int kIPHeaderSize = 14;
 const int kTCPHeaderSize = 20;
 const int kUDPHeaderSize = 8;
+
+int parse_pcap_file(const char *filename) {
+  char errbuf[PCAP_ERRBUF_SIZE];
+  pcap_t *handle = pcap_open_offline(filename, errbuf);
+
+  if (handle == NULL) {
+    fprintf(stderr, "Couldn't open file %s: %s\n", filename, errbuf);
+    return 2;
+  }
+
+  struct pcap_pkthdr header;
+  const u_char *packet;
+
+  packet = pcap_next(handle, &header);
+  printf("Read a packet with length of [%d]\n", header.len);
+
+  const uint8_t *eth = packet;
+
+  EthernetFrame ef;
+  parse_ethframe(eth, &ef);
+  print_ethframe(&ef);
+
+  if (ef.type != 0x0800)
+    return 3;
+
+  const uint8_t *ipv4_data = packet + kIPHeaderSize;
+
+  IPHeader ipv4;
+  parse_ipv4(ipv4_data, header.len - kIPHeaderSize, &ipv4);
+  print_ipv4(&ipv4);
+
+  if (ipv4.protocol == IPPROTO_TCP) {
+    const uint8_t *tcp_data = ipv4_data + ipv4.ihl * 4;
+
+    TCPHeader tcp;
+    parse_tcp(tcp_data, ipv4.total_length, &tcp);
+    print_tcp(&tcp);
+
+    free(tcp.payload);
+  } else if (ipv4.protocol == IPPROTO_UDP) {
+    const uint8_t *udp_data = ipv4_data + ipv4.ihl * 4;
+
+    UDPHeader udp;
+    parse_udp(udp_data, &udp);
+    print_udp(&udp);
+
+    free(udp.payload);
+  }
+
+  pcap_close(handle);
+
+  return 0;
+}
 
 int parse_ethframe(const uint8_t *data, EthernetFrame *out) {
   memcpy(out->dst, data, 6);

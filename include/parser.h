@@ -9,6 +9,8 @@ extern const int kIPHeaderSize;
 extern const int kTCPHeaderSize;
 extern const int kUDPHeaderSize;
 
+int parse_pcap_file(const char *filename);
+
 int parse_ethframe(const uint8_t *data, EthernetFrame *out);
 int parse_ipv4(const uint8_t *data, size_t len, IPHeader *out);
 int parse_tcp(const uint8_t *data, size_t total_length, TCPHeader *out);
