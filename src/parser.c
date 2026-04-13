@@ -6,9 +6,7 @@
 int parse_ethframe(const uint8_t *data, EthernetFrame *out) {
   memcpy(out->dst, data, 6);
   memcpy(out->src, data + 6, 6);
-
   out->type = data[12] << 8 | data[13];
-
   return 0;
 }
 
@@ -26,7 +24,11 @@ int parse_ipv4(const uint8_t *data, size_t len, IPHeader *out) {
 
   out->total_length = data[2] << 8 | data[3];
   out->identification = data[4] << 8 | data[5];
-  out->flags = data[6] << 3;
+
+  uint16_t flags_fo = (data[6] << 8) | data[7];
+  out->flags = flags_fo >> 13;
+  out->fragment_offset = flags_fo & 0x1FFF;
+
   out->ttl = data[8];
   out->protocol = data[9];
   out->checksum = data[10] << 8 | data[11];
