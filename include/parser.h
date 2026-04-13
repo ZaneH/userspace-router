@@ -7,7 +7,7 @@
 
 #define SIZE_ETHERNET 14
 #define SIZE_TCP 20
-#define SIZE_UDP 20
+#define SIZE_UDP 8
 
 int parse_pcap_file(const char *filename);
 

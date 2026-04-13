@@ -6,20 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-int parse_pcap_file(const char *filename) {
-  char errbuf[PCAP_ERRBUF_SIZE];
-  pcap_t *handle = pcap_open_offline(filename, errbuf);
-
-  if (handle == NULL) {
-    fprintf(stderr, "Couldn't open file %s: %s\n", filename, errbuf);
-    return 2;
-  }
-
-  struct pcap_pkthdr header;
-  const u_char *packet;
-
-  packet = pcap_next(handle, &header);
-  printf("Read a packet with length of [%d]\n", header.len);
+void got_packet(u_char *args, const struct pcap_pkthdr *header,
+                const u_char *packet) {
+  printf("Got packet\n");
+  printf("Read a packet with length of [%d]\n", header->len);
 
   const uint8_t *eth = packet;
 
@@ -28,12 +18,12 @@ int parse_pcap_file(const char *filename) {
   print_ethframe(&ef);
 
   if (ef.type != 0x0800)
-    return 3;
+    return;
 
   const uint8_t *ipv4_data = packet + SIZE_ETHERNET;
 
   IPHeader ipv4;
-  parse_ipv4(ipv4_data, header.len - SIZE_ETHERNET, &ipv4);
+  parse_ipv4(ipv4_data, header->len - SIZE_ETHERNET, &ipv4);
   print_ipv4(&ipv4);
 
   if (ipv4.protocol == IPPROTO_TCP) {
@@ -53,7 +43,18 @@ int parse_pcap_file(const char *filename) {
 
     free(udp.payload);
   }
+}
 
+int parse_pcap_file(const char *filename) {
+  char errbuf[PCAP_ERRBUF_SIZE];
+  pcap_t *handle = pcap_open_offline(filename, errbuf);
+
+  if (handle == NULL) {
+    fprintf(stderr, "Couldn't open file %s: %s\n", filename, errbuf);
+    return 2;
+  }
+
+  pcap_loop(handle, -1, got_packet, NULL);
   pcap_close(handle);
 
   return 0;
