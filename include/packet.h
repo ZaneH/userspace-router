@@ -30,6 +30,21 @@ typedef struct {
 typedef struct {
   uint16_t src_port;
   uint16_t dst_port;
+  uint32_t seq_number;
+  uint32_t ack_number;
+  uint8_t hdr_len;
+  uint8_t flags;
+  uint16_t window;
+  uint16_t checksum;
+  uint16_t urgent_pointer;
+  uint8_t options;
+  uint8_t *payload;
+  size_t payload_size;
+} TCPHeader;
+
+typedef struct {
+  uint16_t src_port;
+  uint16_t dst_port;
   uint16_t length;
   uint16_t checksum;
   uint8_t *payload;
