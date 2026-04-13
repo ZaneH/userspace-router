@@ -2,11 +2,18 @@
 #include "../include/parser.h"
 #include <pcap/pcap.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 void print_mac(const uint8_t mac[6]) {
   printf("%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3],
          mac[4], mac[5]);
+}
+
+void print_payload(const uint8_t *data, size_t len) {
+  for (int i = 0; i < len; i++) {
+    printf(i == len - 1 ? "%02x" : "%02x ", data[i]);
+  };
 }
 
 int main(int argc, char *argv[]) {
@@ -57,8 +64,24 @@ int main(int argc, char *argv[]) {
   printf("TTL: %d\n", ipv4.ttl);
   printf("Protocol: %d\n", ipv4.protocol);
   printf("Checksum: 0x%x\n", ipv4.checksum);
-  printf("Src: 0x%x\n", ipv4.src);
-  printf("Dst: 0x%x\n", ipv4.dst);
+  printf("Src: 0x%08x\n", ipv4.src);
+  printf("Dst: 0x%08x\n", ipv4.dst);
+
+  const uint8_t *udp_data = ipv4_data + ipv4.ihl * 4;
+
+  UDPHeader udp;
+  parse_udp(udp_data, &udp);
+
+  printf("=== UDP ===========================\n");
+  printf("Source Port: %d\n", udp.src_port);
+  printf("Destination Port: %d\n", udp.dst_port);
+  printf("Length: %d\n", udp.length);
+  printf("Checksum: 0x%04x\n", udp.checksum);
+  printf("Payload:\n");
+  print_payload(udp.payload, udp.length - 8);
+  printf("\n");
+
+  free(udp.payload);
 
   pcap_close(handle);
 

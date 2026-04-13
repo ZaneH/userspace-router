@@ -1,6 +1,7 @@
 #include "../include/packet.h"
 #include <arpa/inet.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 
 int parse_ethframe(const uint8_t *data, EthernetFrame *out) {
@@ -35,5 +36,15 @@ int parse_ipv4(const uint8_t *data, size_t len, IPHeader *out) {
   out->src = data[12] << 24 | data[13] << 16 | data[14] << 8 | data[15];
   out->dst = data[16] << 24 | data[17] << 16 | data[18] << 8 | data[19];
 
+  return 0;
+}
+
+int parse_udp(const uint8_t *data, UDPHeader *out) {
+  out->src_port = data[0] << 8 | data[1];
+  out->dst_port = data[2] << 8 | data[3];
+  out->length = data[4] << 8 | data[5];
+  out->checksum = data[6] << 8 | data[7];
+  out->payload = malloc(out->length);
+  memcpy(out->payload, data + 8, out->length - 8);
   return 0;
 }

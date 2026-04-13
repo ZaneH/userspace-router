@@ -27,4 +27,12 @@ typedef struct {
   uint16_t type;
 } EthernetFrame;
 
+typedef struct {
+  uint16_t src_port;
+  uint16_t dst_port;
+  uint16_t length;
+  uint16_t checksum;
+  uint8_t *payload;
+} UDPHeader;
+
 #endif // INCLUDE_INCLUDE_PACKET_H_
