@@ -5,9 +5,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-extern const int kIPHeaderSize;
-extern const int kTCPHeaderSize;
-extern const int kUDPHeaderSize;
+#define SIZE_ETHERNET 14
+#define SIZE_TCP 20
+#define SIZE_UDP 20
 
 int parse_pcap_file(const char *filename);
 

@@ -64,6 +64,6 @@ void print_udp(const UDPHeader *hdr) {
   printf("Length: %d\n", hdr->length);
   printf("Checksum: 0x%04x\n", hdr->checksum);
   printf("Payload:\n");
-  print_payload(hdr->payload, hdr->length - kUDPHeaderSize);
+  print_payload(hdr->payload, hdr->length - SIZE_UDP);
   printf("\n");
 }
