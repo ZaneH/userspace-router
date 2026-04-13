@@ -67,21 +67,43 @@ int main(int argc, char *argv[]) {
   printf("Src: 0x%08x\n", ipv4.src);
   printf("Dst: 0x%08x\n", ipv4.dst);
 
-  const uint8_t *udp_data = ipv4_data + ipv4.ihl * 4;
+  if (ipv4.protocol == IPPROTO_TCP) {
+    const uint8_t *tcp_data = ipv4_data + ipv4.ihl * 4;
 
-  UDPHeader udp;
-  parse_udp(udp_data, &udp);
+    TCPHeader tcp;
+    parse_tcp(tcp_data, ipv4.total_length, &tcp);
 
-  printf("=== UDP ===========================\n");
-  printf("Source Port: %d\n", udp.src_port);
-  printf("Destination Port: %d\n", udp.dst_port);
-  printf("Length: %d\n", udp.length);
-  printf("Checksum: 0x%04x\n", udp.checksum);
-  printf("Payload:\n");
-  print_payload(udp.payload, udp.length - 8);
-  printf("\n");
+    printf("=== TCP ===========================\n");
+    printf("Source Port: %d\n", tcp.src_port);
+    printf("Destination Port: %d\n", tcp.dst_port);
+    printf("Sequence Number (Raw): %u\n", tcp.seq_number);
+    printf("Acknowledgement Number (Raw): %u\n", tcp.ack_number);
+    printf("Header Length: %d\n", tcp.hdr_len);
+    printf("Flags: 0x%03x\n", tcp.flags);
+    printf("Window: %d\n", tcp.window);
+    printf("Checksum: 0x%x\n", tcp.checksum);
+    printf("Urgent Pointer: %d\n", tcp.urgent_pointer);
+    printf("Options: WIP\n");
+    printf("Payload:\n");
+    print_payload(tcp.payload, tcp.payload_size);
+    printf("\n");
+  } else if (ipv4.protocol == IPPROTO_UDP) {
+    const uint8_t *udp_data = ipv4_data + ipv4.ihl * 4;
 
-  free(udp.payload);
+    UDPHeader udp;
+    parse_udp(udp_data, &udp);
+
+    printf("=== UDP ===========================\n");
+    printf("Source Port: %d\n", udp.src_port);
+    printf("Destination Port: %d\n", udp.dst_port);
+    printf("Length: %d\n", udp.length);
+    printf("Checksum: 0x%04x\n", udp.checksum);
+    printf("Payload:\n");
+    print_payload(udp.payload, udp.length - 8); // TODO: Why - 8?
+    printf("\n");
+
+    free(udp.payload);
+  }
 
   pcap_close(handle);
 
