@@ -8,9 +8,9 @@
 void print_mac(const uint8_t mac[6]);
 void print_payload(const uint8_t *data, size_t len);
 
-void print_ethframe(const EthernetFrame *hdr);
-void print_ipv4(const IPHeader *hdr);
-void print_tcp(const TCPHeader *hdr);
-void print_udp(const UDPHeader *hdr);
+void print_ethframe(const ethernet_frame_t *frame);
+void print_ipv4(const ipv4_header_t *hdr);
+void print_tcp(const tcp_pkt_t *pkt);
+void print_udp(const udp_pkt_t *pkt);
 
 #endif // INCLUDE_HELPER_H_

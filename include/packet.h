@@ -19,13 +19,13 @@ typedef struct {
   uint32_t dst;
   const uint8_t *options;
   uint8_t options_len;
-} IPHeader;
+} ipv4_header_t;
 
 typedef struct {
   uint8_t dst[6];
   uint8_t src[6];
   uint16_t type;
-} EthernetFrame;
+} ethernet_frame_t;
 
 typedef struct {
   uint16_t src_port;
@@ -40,7 +40,7 @@ typedef struct {
   uint8_t options;
   uint8_t *payload;
   size_t payload_size;
-} TCPHeader;
+} tcp_pkt_t;
 
 typedef struct {
   uint16_t src_port;
@@ -48,6 +48,6 @@ typedef struct {
   uint16_t length;
   uint16_t checksum;
   uint8_t *payload;
-} UDPHeader;
+} udp_pkt_t;
 
 #endif // INCLUDE_PACKET_H_

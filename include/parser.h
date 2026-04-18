@@ -11,9 +11,9 @@
 
 int parse_pcap_file(const char *filename);
 
-int parse_ethframe(const uint8_t *data, EthernetFrame *out);
-int parse_ipv4(const uint8_t *data, size_t len, IPHeader *out);
-int parse_tcp(const uint8_t *data, size_t total_length, TCPHeader *out);
-int parse_udp(const uint8_t *data, UDPHeader *out);
+int parse_ethframe(const uint8_t *data, ethernet_frame_t *out);
+int parse_ipv4(const uint8_t *data, size_t len, ipv4_header_t *out);
+int parse_tcp(const uint8_t *data, size_t total_length, tcp_pkt_t *out);
+int parse_udp(const uint8_t *data, udp_pkt_t *out);
 
 #endif // INCLUDE_PARSER_H_

@@ -14,16 +14,16 @@ void print_payload(const uint8_t *data, size_t len) {
   };
 }
 
-void print_ethframe(const EthernetFrame *hdr) {
+void print_ethframe(const ethernet_frame_t *frame) {
   printf("=== EthernetFrame ===========================\n");
   printf("Dst: ");
-  print_mac(hdr->dst);
+  print_mac(frame->dst);
   printf("\nSrc: ");
-  print_mac(hdr->src);
-  printf("\nType: 0x%04x\n", hdr->type);
+  print_mac(frame->src);
+  printf("\nType: 0x%04x\n", frame->type);
 }
 
-void print_ipv4(const IPHeader *hdr) {
+void print_ipv4(const ipv4_header_t *hdr) {
   printf("=== IPv4 ===========================\n");
   printf("Version: %d\n", hdr->version);
   printf("IHL: %d\n", hdr->ihl);
@@ -40,30 +40,30 @@ void print_ipv4(const IPHeader *hdr) {
   printf("Dst: 0x%08x\n", hdr->dst);
 }
 
-void print_tcp(const TCPHeader *hdr) {
+void print_tcp(const tcp_pkt_t *pkt) {
   printf("=== TCP ===========================\n");
-  printf("Source Port: %d\n", hdr->src_port);
-  printf("Destination Port: %d\n", hdr->dst_port);
-  printf("Sequence Number (Raw): %u\n", hdr->seq_number);
-  printf("Acknowledgement Number (Raw): %u\n", hdr->ack_number);
-  printf("Header Length: %d\n", hdr->hdr_len);
-  printf("Flags: 0x%03x\n", hdr->flags);
-  printf("Window: %d\n", hdr->window);
-  printf("Checksum: 0x%x\n", hdr->checksum);
-  printf("Urgent Pointer: %d\n", hdr->urgent_pointer);
+  printf("Source Port: %d\n", pkt->src_port);
+  printf("Destination Port: %d\n", pkt->dst_port);
+  printf("Sequence Number (Raw): %u\n", pkt->seq_number);
+  printf("Acknowledgement Number (Raw): %u\n", pkt->ack_number);
+  printf("Header Length: %d\n", pkt->hdr_len);
+  printf("Flags: 0x%03x\n", pkt->flags);
+  printf("Window: %d\n", pkt->window);
+  printf("Checksum: 0x%x\n", pkt->checksum);
+  printf("Urgent Pointer: %d\n", pkt->urgent_pointer);
   printf("Options: WIP\n");
   printf("Payload:\n");
-  print_payload(hdr->payload, hdr->payload_size);
+  print_payload(pkt->payload, pkt->payload_size);
   printf("\n");
 }
 
-void print_udp(const UDPHeader *hdr) {
+void print_udp(const udp_pkt_t *pkt) {
   printf("=== UDP ===========================\n");
-  printf("Source Port: %d\n", hdr->src_port);
-  printf("Destination Port: %d\n", hdr->dst_port);
-  printf("Length: %d\n", hdr->length);
-  printf("Checksum: 0x%04x\n", hdr->checksum);
+  printf("Source Port: %d\n", pkt->src_port);
+  printf("Destination Port: %d\n", pkt->dst_port);
+  printf("Length: %d\n", pkt->length);
+  printf("Checksum: 0x%04x\n", pkt->checksum);
   printf("Payload:\n");
-  print_payload(hdr->payload, hdr->length - SIZE_UDP);
+  print_payload(pkt->payload, pkt->length - SIZE_UDP);
   printf("\n");
 }
