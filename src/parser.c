@@ -13,7 +13,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
 
   const uint8_t *eth = packet;
 
-  EthernetFrame ef;
+  ethernet_frame_t ef;
   parse_ethframe(eth, &ef);
   print_ethframe(&ef);
 
@@ -22,14 +22,14 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
 
   const uint8_t *ipv4_data = packet + SIZE_ETHERNET;
 
-  IPHeader ipv4;
+  ipv4_header_t ipv4;
   parse_ipv4(ipv4_data, header->len - SIZE_ETHERNET, &ipv4);
   print_ipv4(&ipv4);
 
   if (ipv4.protocol == IPPROTO_TCP) {
     const uint8_t *tcp_data = ipv4_data + ipv4.ihl * 4;
 
-    TCPHeader tcp;
+    tcp_pkt_t tcp;
     parse_tcp(tcp_data, ipv4.total_length, &tcp);
     print_tcp(&tcp);
 
@@ -37,7 +37,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
   } else if (ipv4.protocol == IPPROTO_UDP) {
     const uint8_t *udp_data = ipv4_data + ipv4.ihl * 4;
 
-    UDPHeader udp;
+    udp_pkt_t udp;
     parse_udp(udp_data, &udp);
     print_udp(&udp);
 
@@ -49,7 +49,7 @@ typedef struct {
   const char *filename;
 } read_packets_args_t;
 
-void *read_all_packets(void *arg) {
+void *start_pcap_reader(void *arg) {
   char errbuf[PCAP_ERRBUF_SIZE];
 
   read_packets_args_t *args = (read_packets_args_t *)arg;
@@ -72,8 +72,7 @@ int parse_pcap_file(const char *filename) {
   pthread_t thread;
   read_packets_args_t *args = malloc(sizeof(read_packets_args_t));
   args->filename = filename;
-
-  if (pthread_create(&thread, NULL, read_all_packets, args) != 0) {
+  if (pthread_create(&thread, NULL, start_pcap_reader, args) != 0) {
     free(args);
     return 2;
   }
@@ -83,14 +82,14 @@ int parse_pcap_file(const char *filename) {
   return 0;
 }
 
-int parse_ethframe(const uint8_t *data, EthernetFrame *out) {
+int parse_ethframe(const uint8_t *data, ethernet_frame_t *out) {
   memcpy(out->dst, data, 6);
   memcpy(out->src, data + 6, 6);
   out->type = data[12] << 8 | data[13];
   return 0;
 }
 
-int parse_ipv4(const uint8_t *data, size_t len, IPHeader *out) {
+int parse_ipv4(const uint8_t *data, size_t len, ipv4_header_t *out) {
   if (len < 20)
     return -1;
 
@@ -118,7 +117,7 @@ int parse_ipv4(const uint8_t *data, size_t len, IPHeader *out) {
   return 0;
 }
 
-int parse_tcp(const uint8_t *data, size_t total_length, TCPHeader *out) {
+int parse_tcp(const uint8_t *data, size_t total_length, tcp_pkt_t *out) {
   out->src_port = data[0] << 8 | data[1];
   out->dst_port = data[2] << 8 | data[3];
   out->seq_number = 1;
@@ -140,7 +139,7 @@ int parse_tcp(const uint8_t *data, size_t total_length, TCPHeader *out) {
   return 0;
 }
 
-int parse_udp(const uint8_t *data, UDPHeader *out) {
+int parse_udp(const uint8_t *data, udp_pkt_t *out) {
   out->src_port = data[0] << 8 | data[1];
   out->dst_port = data[2] << 8 | data[3];
   out->length = data[4] << 8 | data[5];

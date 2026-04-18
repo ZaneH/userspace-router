@@ -19,3 +19,7 @@ just build
     - [ ] Multi-threading
 - [ ] Forwarding
 - [ ] Optimizing
+
+## References
+
+- [Cisco NetAcad](https://www.netacad.com/courses/networking-basics)
