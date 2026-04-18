@@ -2,13 +2,13 @@
 #include "../include/helper.h"
 #include "../include/packet.h"
 #include <arpa/inet.h>
+#include <pthread.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
 void got_packet(u_char *args, const struct pcap_pkthdr *header,
                 const u_char *packet) {
-  printf("Got packet\n");
   printf("Read a packet with length of [%d]\n", header->len);
 
   const uint8_t *eth = packet;
@@ -45,17 +45,40 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
   }
 }
 
-int parse_pcap_file(const char *filename) {
+typedef struct {
+  const char *filename;
+} read_packets_args_t;
+
+void *read_all_packets(void *arg) {
   char errbuf[PCAP_ERRBUF_SIZE];
+
+  read_packets_args_t *args = (read_packets_args_t *)arg;
+  const char *filename = args->filename;
+  free(args);
+
   pcap_t *handle = pcap_open_offline(filename, errbuf);
 
   if (handle == NULL) {
     fprintf(stderr, "Couldn't open file %s: %s\n", filename, errbuf);
-    return 2;
   }
 
   pcap_loop(handle, -1, got_packet, NULL);
   pcap_close(handle);
+
+  return NULL;
+}
+
+int parse_pcap_file(const char *filename) {
+  pthread_t thread;
+  read_packets_args_t *args = malloc(sizeof(read_packets_args_t));
+  args->filename = filename;
+
+  if (pthread_create(&thread, NULL, read_all_packets, args) != 0) {
+    free(args);
+    return 2;
+  }
+
+  pthread_join(thread, NULL);
 
   return 0;
 }
