@@ -39,13 +39,16 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
     parsed->tcp = tcp;
 
     pthread_mutex_lock(&q->mutex);
+
+    if (ring_buffer_full(q->rb)) {
+      while (ring_buffer_full(q->rb))
+        pthread_cond_wait(&q->has_space, &q->mutex);
+    }
+
     if (!ring_buffer_full(q->rb)) {
       ring_buffer_push(q->rb, (uintptr_t)parsed);
-    } else {
-      printf("Queue is full, throwing packet away\n");
-      free(parsed->tcp.payload);
-      free(parsed);
     }
+
     pthread_cond_signal(&q->not_empty);
     pthread_mutex_unlock(&q->mutex);
   } else if (ipv4.protocol == IPPROTO_UDP) {
@@ -60,13 +63,16 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
     parsed->udp = udp;
 
     pthread_mutex_lock(&q->mutex);
+
+    if (ring_buffer_full(q->rb)) {
+      while (ring_buffer_full(q->rb))
+        pthread_cond_wait(&q->has_space, &q->mutex);
+    }
+
     if (!ring_buffer_full(q->rb)) {
       ring_buffer_push(q->rb, (uintptr_t)parsed);
-    } else {
-      printf("Queue is full, throwing packet away\n");
-      free(parsed->udp.payload);
-      free(parsed);
     }
+
     pthread_cond_signal(&q->not_empty);
     pthread_mutex_unlock(&q->mutex);
   }
@@ -124,6 +130,7 @@ void *start_pcap_parser(void *arg) {
 
     uintptr_t result;
     ring_buffer_pop(q->rb, &result);
+    pthread_cond_signal(&q->has_space);
     pthread_mutex_unlock(&q->mutex);
 
     parsed_packet_t *parsed = (parsed_packet_t *)result;
@@ -153,7 +160,8 @@ int read_parse_pcap_file(const char *filename) {
   shared_queue_t q;
   pthread_mutex_t q_mutex;
   pthread_cond_t not_empty_cond;
-  shared_queue_create(&q, &rb, &q_mutex, &not_empty_cond);
+  pthread_cond_t has_space_cond;
+  shared_queue_create(&q, &rb, &q_mutex, &not_empty_cond, &has_space_cond);
 
   read_packets_args_t *reader_args = malloc(sizeof(read_packets_args_t));
   reader_args->filename = filename;
@@ -166,6 +174,7 @@ int read_parse_pcap_file(const char *filename) {
       0) {
     free(reader_args);
     ring_buffer_destroy(&rb);
+    shared_queue_destroy(&q);
     return 2;
   }
 
@@ -173,6 +182,7 @@ int read_parse_pcap_file(const char *filename) {
       0) {
     free(parser_args);
     ring_buffer_destroy(&rb);
+    shared_queue_destroy(&q);
     return 2;
   }
 
@@ -180,6 +190,7 @@ int read_parse_pcap_file(const char *filename) {
   pthread_join(parser_thread, NULL);
 
   ring_buffer_destroy(&rb);
+  shared_queue_destroy(&q);
 
   return 0;
 }
