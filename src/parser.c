@@ -143,6 +143,8 @@ void *start_pcap_parser(void *arg) {
       print_udp(&parsed->udp);
       free(parsed->udp.payload);
       break;
+    default:
+      printf("Unhandled packet type (%d)", parsed->type);
     }
 
     free(parsed);

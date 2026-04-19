@@ -4,25 +4,49 @@
 #include "identifiers.h"
 
 typedef struct {
+  /// A unique identifier for the interface
+  uint16_t id;
 } router_interface_t;
+
+typedef struct {
+  /// The network IP (e.g. 192.168.0.0, 10.0.0.0)
+  ip_address_t network;
+  /// Significant bits for matching the network IP
+  subnet_mask_t nw_prefix_len;
+  /// Interface to route packets to when matched
+  router_interface_t target;
+} routing_table_entry_t;
+
+typedef struct {
+  /// Logical address of host
+  ip_address_t host_ip;
+  /// Physical address of host
+  mac_address_t host_mac;
+} arp_table_entry_t;
+
+typedef routing_table_entry_t **routing_table_t;
 
 typedef struct {
   /// IP address configured for this router
   ip_address_t ip;
   /// Associates known IP addresses with their MAC address
-  void *arp_table;
+  arp_table_entry_t **arp_table;
+  uint64_t arp_table_len;
   /// Known networks to route packets to
-  void *routing_table;
-  /// Packets with destinations not known to this router are forwarded to the
-  /// default route
+  routing_table_entry_t **routing_table;
+  uint64_t routing_table_len;
+  /// Packets with destination networks not known to this router are forwarded
+  /// to the default route
   router_interface_t *default_route;
   /// Identifies the network and host bits
   subnet_mask_t subnet_mask;
-  /// Unique identifier sometimes referred to as the physical address
+  /// Physical address of router
   mac_address_t mac_address;
 } router_t;
 
 void router_create(router_t *r, ip_address_t ip, subnet_mask_t subnet_mask,
-                   mac_address_t mac);
+                   mac_address_t mac, routing_table_entry_t **routing_table);
+int routing_table_create(routing_table_t *rt, routing_table_entry_t **entries,
+                         int len);
 
 #endif // INCLUDE_ROUTING_H_
