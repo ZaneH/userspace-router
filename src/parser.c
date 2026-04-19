@@ -35,7 +35,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
     parse_tcp(tcp_data, ipv4.total_length, &tcp);
     print_tcp(&tcp);
 
-    parsed_packet_t parsed = {.type = PACKET_TYPE_TCP, .tcp = tcp};
+    parsed_packet_t *parsed = malloc(sizeof(parsed_packet_t));
+    parsed->type = PACKET_TYPE_TCP;
+    parsed->tcp = tcp;
+
     if (!ring_buffer_full(queue)) {
       printf("Placing value in queue\n");
       ring_buffer_push(queue, (uintptr_t *)&parsed);
@@ -43,6 +46,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
       printf("Queue is full\n");
     }
 
+    free(parsed);
     free(tcp.payload);
   } else if (ipv4.protocol == IPPROTO_UDP) {
     const uint8_t *udp_data = ipv4_data + ipv4.ihl * 4;
@@ -51,7 +55,10 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
     parse_udp(udp_data, &udp);
     print_udp(&udp);
 
-    parsed_packet_t parsed = {.type = PACKET_TYPE_UDP, .udp = udp};
+    parsed_packet_t *parsed = malloc(sizeof(parsed_packet_t));
+    parsed->type = PACKET_TYPE_UDP;
+    parsed->udp = udp;
+
     if (!ring_buffer_full(queue)) {
       printf("Placing value in queue\n");
       ring_buffer_push(queue, (uintptr_t *)&parsed);
@@ -59,6 +66,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
       printf("Queue is full\n");
     }
 
+    free(parsed);
     free(udp.payload);
   }
 }
@@ -97,9 +105,8 @@ void *start_pcap_parser(void *arg) {
   ring_buffer_t *queue = args->queue;
   free(arg);
 
-  uintptr_t result = 0;
+  uintptr_t result;
   ring_buffer_pop(queue, &result);
-
   printf("Got this from queue: %p\n", &result);
 
   return NULL;
@@ -109,7 +116,7 @@ int read_parse_pcap_file(const char *filename) {
   pthread_t reader_thread;
   pthread_t parser_thread;
 
-  ring_buffer_t queue = ring_buffer_create();
+  ring_buffer_t queue = ring_buffer_create(10);
 
   read_packets_args_t *reader_args = malloc(sizeof(read_packets_args_t));
   parse_packets_args_t *parser_args = malloc(sizeof(parse_packets_args_t));
