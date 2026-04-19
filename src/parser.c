@@ -46,6 +46,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
       printf("Queue is full\n");
     }
 
+    // TODO: Use pre-allocated pool to reduce mallocs in hot-path
     free(parsed);
     free(tcp.payload);
   } else if (ipv4.protocol == IPPROTO_UDP) {
@@ -66,6 +67,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
       printf("Queue is full\n");
     }
 
+    // TODO: Use pre-allocated pool to reduce mallocs in hot-path
     free(parsed);
     free(udp.payload);
   }
