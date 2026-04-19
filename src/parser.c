@@ -18,7 +18,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
 
   ethernet_frame_t ef;
   parse_ethframe(eth, &ef);
-  print_ethframe(&ef);
 
   if (ef.type != 0x0800)
     return;
@@ -27,56 +26,49 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
 
   ipv4_header_t ipv4;
   parse_ipv4(ipv4_data, header->len - SIZE_ETHERNET, &ipv4);
-  print_ipv4(&ipv4);
 
   if (ipv4.protocol == IPPROTO_TCP) {
     const uint8_t *tcp_data = ipv4_data + ipv4.ihl * 4;
 
     tcp_pkt_t tcp;
     parse_tcp(tcp_data, ipv4.total_length, &tcp);
-    print_tcp(&tcp);
 
+    // TODO: Use pre-allocated pool to reduce mallocs in hot-path
     parsed_packet_t *parsed = malloc(sizeof(parsed_packet_t));
     parsed->type = PACKET_TYPE_TCP;
     parsed->tcp = tcp;
 
     pthread_mutex_lock(&q->mutex);
     if (!ring_buffer_full(q->rb)) {
-      printf("Placing value in queue\n");
-      ring_buffer_push(q->rb, (uintptr_t *)&parsed);
+      ring_buffer_push(q->rb, (uintptr_t)parsed);
     } else {
-      printf("Queue is full\n");
+      printf("Queue is full, throwing packet away\n");
+      free(parsed->tcp.payload);
+      free(parsed);
     }
     pthread_cond_signal(&q->not_empty);
     pthread_mutex_unlock(&q->mutex);
-
-    // TODO: Use pre-allocated pool to reduce mallocs in hot-path
-    free(parsed);
-    free(tcp.payload);
   } else if (ipv4.protocol == IPPROTO_UDP) {
     const uint8_t *udp_data = ipv4_data + ipv4.ihl * 4;
 
     udp_pkt_t udp;
     parse_udp(udp_data, &udp);
-    print_udp(&udp);
 
+    // TODO: Use pre-allocated pool to reduce mallocs in hot-path
     parsed_packet_t *parsed = malloc(sizeof(parsed_packet_t));
     parsed->type = PACKET_TYPE_UDP;
     parsed->udp = udp;
 
     pthread_mutex_lock(&q->mutex);
     if (!ring_buffer_full(q->rb)) {
-      printf("Placing value in queue\n");
-      ring_buffer_push(q->rb, (uintptr_t *)&parsed);
+      ring_buffer_push(q->rb, (uintptr_t)parsed);
     } else {
-      printf("Queue is full\n");
+      printf("Queue is full, throwing packet away\n");
+      free(parsed->udp.payload);
+      free(parsed);
     }
     pthread_cond_signal(&q->not_empty);
     pthread_mutex_unlock(&q->mutex);
-
-    // TODO: Use pre-allocated pool to reduce mallocs in hot-path
-    free(parsed);
-    free(udp.payload);
   }
 }
 
@@ -133,7 +125,20 @@ void *start_pcap_parser(void *arg) {
     uintptr_t result;
     ring_buffer_pop(q->rb, &result);
     pthread_mutex_unlock(&q->mutex);
-    printf("Got this from queue: %p\n", &result);
+
+    parsed_packet_t *parsed = (parsed_packet_t *)result;
+    switch (parsed->type) {
+    case PACKET_TYPE_TCP:
+      print_tcp(&parsed->tcp);
+      free(parsed->tcp.payload);
+      break;
+    case PACKET_TYPE_UDP:
+      print_udp(&parsed->udp);
+      free(parsed->udp.payload);
+      break;
+    }
+
+    free(parsed);
   }
 
   return NULL;
@@ -143,11 +148,12 @@ int read_parse_pcap_file(const char *filename) {
   pthread_t reader_thread;
   pthread_t parser_thread;
 
-  ring_buffer_t rb = ring_buffer_create(10);
+  ring_buffer_t rb;
+  ring_buffer_create(&rb, 10);
   shared_queue_t q;
   pthread_mutex_t q_mutex;
-  pthread_cond_t non_empty_cond;
-  shared_queue_create(&q, &rb, &q_mutex, &non_empty_cond);
+  pthread_cond_t not_empty_cond;
+  shared_queue_create(&q, &rb, &q_mutex, &not_empty_cond);
 
   read_packets_args_t *reader_args = malloc(sizeof(read_packets_args_t));
   reader_args->filename = filename;
@@ -159,21 +165,21 @@ int read_parse_pcap_file(const char *filename) {
   if (pthread_create(&reader_thread, NULL, start_pcap_reader, reader_args) !=
       0) {
     free(reader_args);
-    free(rb.buffer);
+    ring_buffer_destroy(&rb);
     return 2;
   }
 
   if (pthread_create(&parser_thread, NULL, start_pcap_parser, parser_args) !=
       0) {
     free(parser_args);
-    free(rb.buffer);
+    ring_buffer_destroy(&rb);
     return 2;
   }
 
   pthread_join(reader_thread, NULL);
   pthread_join(parser_thread, NULL);
 
-  free(rb.buffer);
+  ring_buffer_destroy(&rb);
 
   return 0;
 }
