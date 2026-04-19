@@ -2,6 +2,7 @@
 #include "../include/helper.h"
 #include "../include/packet.h"
 #include "../include/ring_buffer.h"
+#include "../include/shared_queue.h"
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <stddef.h>
@@ -11,7 +12,7 @@
 void got_packet(u_char *args, const struct pcap_pkthdr *header,
                 const u_char *packet) {
   printf("Read a packet with length of [%d]\n", header->len);
-  ring_buffer_t *queue = (ring_buffer_t *)args;
+  shared_queue_t *q = (shared_queue_t *)args;
 
   const uint8_t *eth = packet;
 
@@ -39,12 +40,15 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
     parsed->type = PACKET_TYPE_TCP;
     parsed->tcp = tcp;
 
-    if (!ring_buffer_full(queue)) {
+    pthread_mutex_lock(&q->mutex);
+    if (!ring_buffer_full(q->rb)) {
       printf("Placing value in queue\n");
-      ring_buffer_push(queue, (uintptr_t *)&parsed);
+      ring_buffer_push(q->rb, (uintptr_t *)&parsed);
     } else {
       printf("Queue is full\n");
     }
+    pthread_cond_signal(&q->not_empty);
+    pthread_mutex_unlock(&q->mutex);
 
     // TODO: Use pre-allocated pool to reduce mallocs in hot-path
     free(parsed);
@@ -60,12 +64,15 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
     parsed->type = PACKET_TYPE_UDP;
     parsed->udp = udp;
 
-    if (!ring_buffer_full(queue)) {
+    pthread_mutex_lock(&q->mutex);
+    if (!ring_buffer_full(q->rb)) {
       printf("Placing value in queue\n");
-      ring_buffer_push(queue, (uintptr_t *)&parsed);
+      ring_buffer_push(q->rb, (uintptr_t *)&parsed);
     } else {
       printf("Queue is full\n");
     }
+    pthread_cond_signal(&q->not_empty);
+    pthread_mutex_unlock(&q->mutex);
 
     // TODO: Use pre-allocated pool to reduce mallocs in hot-path
     free(parsed);
@@ -75,11 +82,11 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
 
 typedef struct {
   const char *filename;
-  ring_buffer_t *queue;
+  shared_queue_t *queue;
 } read_packets_args_t;
 
 typedef struct {
-  ring_buffer_t *queue;
+  shared_queue_t *queue;
 } parse_packets_args_t;
 
 void *start_pcap_reader(void *arg) {
@@ -87,7 +94,7 @@ void *start_pcap_reader(void *arg) {
 
   read_packets_args_t *args = (read_packets_args_t *)arg;
   const char *filename = args->filename;
-  ring_buffer_t *queue = args->queue;
+  shared_queue_t *q = args->queue;
   free(args);
 
   pcap_t *handle = pcap_open_offline(filename, errbuf);
@@ -96,7 +103,13 @@ void *start_pcap_reader(void *arg) {
     fprintf(stderr, "Couldn't open file %s: %s\n", filename, errbuf);
   }
 
-  pcap_loop(handle, -1, got_packet, (u_char *)queue);
+  pcap_loop(handle, -1, got_packet, (u_char *)q);
+
+  pthread_mutex_lock(&q->mutex);
+  q->producer_finished = true;
+  pthread_cond_signal(&q->not_empty);
+  pthread_mutex_unlock(&q->mutex);
+
   pcap_close(handle);
 
   return NULL;
@@ -104,12 +117,24 @@ void *start_pcap_reader(void *arg) {
 
 void *start_pcap_parser(void *arg) {
   parse_packets_args_t *args = (parse_packets_args_t *)arg;
-  ring_buffer_t *queue = args->queue;
+  shared_queue_t *q = args->queue;
   free(arg);
 
-  uintptr_t result;
-  ring_buffer_pop(queue, &result);
-  printf("Got this from queue: %p\n", &result);
+  while (true) {
+    pthread_mutex_lock(&q->mutex);
+    while (ring_buffer_empty(q->rb) && !q->producer_finished)
+      pthread_cond_wait(&q->not_empty, &q->mutex);
+
+    if (ring_buffer_empty(q->rb) && q->producer_finished) {
+      pthread_mutex_unlock(&q->mutex);
+      break;
+    }
+
+    uintptr_t result;
+    ring_buffer_pop(q->rb, &result);
+    pthread_mutex_unlock(&q->mutex);
+    printf("Got this from queue: %p\n", &result);
+  }
 
   return NULL;
 }
@@ -118,31 +143,37 @@ int read_parse_pcap_file(const char *filename) {
   pthread_t reader_thread;
   pthread_t parser_thread;
 
-  ring_buffer_t queue = ring_buffer_create(10);
+  ring_buffer_t rb = ring_buffer_create(10);
+  shared_queue_t q;
+  pthread_mutex_t q_mutex;
+  pthread_cond_t non_empty_cond;
+  shared_queue_create(&q, &rb, &q_mutex, &non_empty_cond);
 
   read_packets_args_t *reader_args = malloc(sizeof(read_packets_args_t));
-  parse_packets_args_t *parser_args = malloc(sizeof(parse_packets_args_t));
-
   reader_args->filename = filename;
-  reader_args->queue = &queue;
+  reader_args->queue = &q;
 
-  parser_args->queue = &queue;
+  parse_packets_args_t *parser_args = malloc(sizeof(parse_packets_args_t));
+  parser_args->queue = &q;
+
   if (pthread_create(&reader_thread, NULL, start_pcap_reader, reader_args) !=
       0) {
     free(reader_args);
+    free(rb.buffer);
     return 2;
   }
 
   if (pthread_create(&parser_thread, NULL, start_pcap_parser, parser_args) !=
       0) {
     free(parser_args);
+    free(rb.buffer);
     return 2;
   }
 
   pthread_join(reader_thread, NULL);
   pthread_join(parser_thread, NULL);
 
-  free(queue.buffer);
+  free(rb.buffer);
 
   return 0;
 }
