@@ -7,8 +7,9 @@ An exercise in C and working with network data. The goal is to create a multi-th
 ```
 git clone https://github.com/ZaneH/userspace-router
 cd userspace-router
+mkdir build
 just build
-./out
+./build/out
 ```
 
 ## Todo

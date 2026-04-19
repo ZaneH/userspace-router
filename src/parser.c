@@ -1,6 +1,7 @@
 #include "../include/parser.h"
 #include "../include/helper.h"
 #include "../include/packet.h"
+#include "../include/ring_buffer.h"
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <stddef.h>
@@ -10,6 +11,7 @@
 void got_packet(u_char *args, const struct pcap_pkthdr *header,
                 const u_char *packet) {
   printf("Read a packet with length of [%d]\n", header->len);
+  ring_buffer_t *queue = (ring_buffer_t *)args;
 
   const uint8_t *eth = packet;
 
@@ -33,6 +35,14 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
     parse_tcp(tcp_data, ipv4.total_length, &tcp);
     print_tcp(&tcp);
 
+    parsed_packet_t parsed = {.type = PACKET_TYPE_TCP, .tcp = tcp};
+    if (!ring_buffer_full(queue)) {
+      printf("Placing value in queue\n");
+      ring_buffer_push(queue, (uintptr_t *)&parsed);
+    } else {
+      printf("Queue is full\n");
+    }
+
     free(tcp.payload);
   } else if (ipv4.protocol == IPPROTO_UDP) {
     const uint8_t *udp_data = ipv4_data + ipv4.ihl * 4;
@@ -41,19 +51,33 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
     parse_udp(udp_data, &udp);
     print_udp(&udp);
 
+    parsed_packet_t parsed = {.type = PACKET_TYPE_UDP, .udp = udp};
+    if (!ring_buffer_full(queue)) {
+      printf("Placing value in queue\n");
+      ring_buffer_push(queue, (uintptr_t *)&parsed);
+    } else {
+      printf("Queue is full\n");
+    }
+
     free(udp.payload);
   }
 }
 
 typedef struct {
   const char *filename;
+  ring_buffer_t *queue;
 } read_packets_args_t;
+
+typedef struct {
+  ring_buffer_t *queue;
+} parse_packets_args_t;
 
 void *start_pcap_reader(void *arg) {
   char errbuf[PCAP_ERRBUF_SIZE];
 
   read_packets_args_t *args = (read_packets_args_t *)arg;
   const char *filename = args->filename;
+  ring_buffer_t *queue = args->queue;
   free(args);
 
   pcap_t *handle = pcap_open_offline(filename, errbuf);
@@ -62,22 +86,54 @@ void *start_pcap_reader(void *arg) {
     fprintf(stderr, "Couldn't open file %s: %s\n", filename, errbuf);
   }
 
-  pcap_loop(handle, -1, got_packet, NULL);
+  pcap_loop(handle, -1, got_packet, (u_char *)queue);
   pcap_close(handle);
 
   return NULL;
 }
 
-int parse_pcap_file(const char *filename) {
-  pthread_t thread;
-  read_packets_args_t *args = malloc(sizeof(read_packets_args_t));
-  args->filename = filename;
-  if (pthread_create(&thread, NULL, start_pcap_reader, args) != 0) {
-    free(args);
+void *start_pcap_parser(void *arg) {
+  parse_packets_args_t *args = (parse_packets_args_t *)arg;
+  ring_buffer_t *queue = args->queue;
+  free(arg);
+
+  uintptr_t result = 0;
+  ring_buffer_pop(queue, &result);
+
+  printf("Got this from queue: %p\n", &result);
+
+  return NULL;
+}
+
+int read_parse_pcap_file(const char *filename) {
+  pthread_t reader_thread;
+  pthread_t parser_thread;
+
+  ring_buffer_t queue = ring_buffer_create();
+
+  read_packets_args_t *reader_args = malloc(sizeof(read_packets_args_t));
+  parse_packets_args_t *parser_args = malloc(sizeof(parse_packets_args_t));
+
+  reader_args->filename = filename;
+  reader_args->queue = &queue;
+
+  parser_args->queue = &queue;
+  if (pthread_create(&reader_thread, NULL, start_pcap_reader, reader_args) !=
+      0) {
+    free(reader_args);
     return 2;
   }
 
-  pthread_join(thread, NULL);
+  if (pthread_create(&parser_thread, NULL, start_pcap_parser, parser_args) !=
+      0) {
+    free(parser_args);
+    return 2;
+  }
+
+  pthread_join(reader_thread, NULL);
+  pthread_join(parser_thread, NULL);
+
+  free(queue.buffer);
 
   return 0;
 }

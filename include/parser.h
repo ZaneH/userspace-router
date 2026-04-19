@@ -9,7 +9,15 @@
 #define SIZE_TCP 20
 #define SIZE_UDP 8
 
-int parse_pcap_file(const char *filename);
+typedef struct {
+  packet_type_t type;
+  union {
+    tcp_pkt_t tcp;
+    udp_pkt_t udp;
+  };
+} parsed_packet_t;
+
+int read_parse_pcap_file(const char *filename);
 
 int parse_ethframe(const uint8_t *data, ethernet_frame_t *out);
 int parse_ipv4(const uint8_t *data, size_t len, ipv4_header_t *out);
