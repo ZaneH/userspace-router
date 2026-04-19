@@ -50,4 +50,9 @@ typedef struct {
   uint8_t *payload;
 } udp_pkt_t;
 
+typedef enum {
+  PACKET_TYPE_TCP,
+  PACKET_TYPE_UDP,
+} packet_type_t;
+
 #endif // INCLUDE_PACKET_H_

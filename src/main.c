@@ -9,7 +9,7 @@ int main(int argc, char *argv[]) {
   }
 
   char *filename = filename = argv[1];
-  int result = parse_pcap_file(filename);
+  int result = read_parse_pcap_file(filename);
   if (result != 0) {
     fprintf(stderr, "Failed to parse file (%d): %s\n", result, filename);
     return result;

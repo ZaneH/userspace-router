@@ -53,11 +53,13 @@ dkms.conf
 
 # debug information files
 *.dwo
+.gdb_history
 
 # pcap data
 captures/
 
 # binaries
-out
+build/
+/out
 
 .direnv/
