@@ -18,8 +18,9 @@ typedef struct {
   uintptr_t *buffer;
 } ring_buffer_t;
 
-ring_buffer_t ring_buffer_create(size_t capacity);
-int ring_buffer_push(ring_buffer_t *rb, uintptr_t *data);
+int ring_buffer_create(ring_buffer_t *rb, size_t capacity);
+void ring_buffer_destroy(ring_buffer_t *rb);
+int ring_buffer_push(ring_buffer_t *rb, uintptr_t data);
 int ring_buffer_pop(ring_buffer_t *rb, uintptr_t *out);
 bool ring_buffer_full(ring_buffer_t *rb);
 bool ring_buffer_empty(ring_buffer_t *rb);
