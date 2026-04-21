@@ -2,6 +2,7 @@
 #define INCLUDE_ROUTING_H_
 
 #include "identifiers.h"
+#include <stddef.h>
 
 typedef struct {
   /// A unique identifier for the interface
@@ -31,10 +32,10 @@ typedef struct {
   ip_address_t ip;
   /// Associates known IP addresses with their MAC address
   arp_table_entry_t **arp_table;
-  uint64_t arp_table_len;
+  size_t arp_table_len;
   /// Known networks to route packets to
   routing_table_entry_t **routing_table;
-  uint64_t routing_table_len;
+  size_t routing_table_len;
   /// Packets with destination networks not known to this router are forwarded
   /// to the default route
   router_interface_t *default_route;

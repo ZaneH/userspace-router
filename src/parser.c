@@ -9,6 +9,27 @@
 #include <stdlib.h>
 #include <string.h>
 
+int process_parsed_packet(parsed_packet_t *pkt, packet_type_t type,
+                          shared_queue_t *q) {
+  pkt->type = type;
+
+  pthread_mutex_lock(&q->mutex);
+
+  if (ring_buffer_full(q->rb)) {
+    while (ring_buffer_full(q->rb))
+      pthread_cond_wait(&q->has_space, &q->mutex);
+  }
+
+  if (!ring_buffer_full(q->rb)) {
+    ring_buffer_push(q->rb, (uintptr_t)pkt);
+  }
+
+  pthread_cond_signal(&q->not_empty);
+  pthread_mutex_unlock(&q->mutex);
+
+  return 0;
+}
+
 void got_packet(u_char *args, const struct pcap_pkthdr *header,
                 const u_char *packet) {
   printf("Read a packet with length of [%d]\n", header->len);
@@ -35,22 +56,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
 
     // TODO: Use pre-allocated pool to reduce mallocs in hot-path
     parsed_packet_t *parsed = malloc(sizeof(parsed_packet_t));
-    parsed->type = PACKET_TYPE_TCP;
     parsed->tcp = tcp;
-
-    pthread_mutex_lock(&q->mutex);
-
-    if (ring_buffer_full(q->rb)) {
-      while (ring_buffer_full(q->rb))
-        pthread_cond_wait(&q->has_space, &q->mutex);
-    }
-
-    if (!ring_buffer_full(q->rb)) {
-      ring_buffer_push(q->rb, (uintptr_t)parsed);
-    }
-
-    pthread_cond_signal(&q->not_empty);
-    pthread_mutex_unlock(&q->mutex);
+    process_parsed_packet(parsed, PACKET_TYPE_TCP, q);
   } else if (ipv4.protocol == IPPROTO_UDP) {
     const uint8_t *udp_data = ipv4_data + ipv4.ihl * 4;
 
@@ -59,22 +66,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
 
     // TODO: Use pre-allocated pool to reduce mallocs in hot-path
     parsed_packet_t *parsed = malloc(sizeof(parsed_packet_t));
-    parsed->type = PACKET_TYPE_UDP;
     parsed->udp = udp;
-
-    pthread_mutex_lock(&q->mutex);
-
-    if (ring_buffer_full(q->rb)) {
-      while (ring_buffer_full(q->rb))
-        pthread_cond_wait(&q->has_space, &q->mutex);
-    }
-
-    if (!ring_buffer_full(q->rb)) {
-      ring_buffer_push(q->rb, (uintptr_t)parsed);
-    }
-
-    pthread_cond_signal(&q->not_empty);
-    pthread_mutex_unlock(&q->mutex);
+    process_parsed_packet(parsed, PACKET_TYPE_UDP, q);
   }
 }
 
