@@ -60,4 +60,13 @@ typedef enum {
   PACKET_TYPE_ICMP,
 } packet_type_t;
 
+typedef struct {
+  packet_type_t type;
+  union {
+    tcp_pkt_t tcp;
+    udp_pkt_t udp;
+    icmp_pkt_t icmp;
+  };
+} parsed_packet_t;
+
 #endif // INCLUDE_PACKET_H_

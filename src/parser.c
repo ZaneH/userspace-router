@@ -1,18 +1,11 @@
 #include "../include/parser.h"
-#include "../include/helper.h"
-#include "../include/packet.h"
-#include "../include/ring_buffer.h"
-#include "../include/shared_queue.h"
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
-int process_parsed_packet(parsed_packet_t *pkt, packet_type_t type,
-                          shared_queue_t *q) {
-  pkt->type = type;
-
+int process_parsed_packet(parsed_packet_t *pkt, shared_queue_t *q) {
   pthread_mutex_lock(&q->mutex);
 
   if (ring_buffer_full(q->rb)) {
@@ -30,8 +23,8 @@ int process_parsed_packet(parsed_packet_t *pkt, packet_type_t type,
   return 0;
 }
 
-void got_packet(u_char *args, const struct pcap_pkthdr *header,
-                const u_char *packet) {
+void process_raw_packet(u_char *args, const struct pcap_pkthdr *header,
+                        const u_char *packet) {
   printf("Read a packet with length of [%d]\n", header->len);
   shared_queue_t *q = (shared_queue_t *)args;
 
@@ -56,8 +49,9 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
 
     // TODO: Use pre-allocated pool to reduce mallocs in hot-path
     parsed_packet_t *parsed = malloc(sizeof(parsed_packet_t));
+    parsed->type = PACKET_TYPE_TCP;
     parsed->tcp = tcp;
-    process_parsed_packet(parsed, PACKET_TYPE_TCP, q);
+    process_parsed_packet(parsed, q);
   } else if (ipv4.protocol == IPPROTO_UDP) {
     const uint8_t *udp_data = ipv4_data + ipv4.ihl * 4;
 
@@ -66,8 +60,9 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
 
     // TODO: Use pre-allocated pool to reduce mallocs in hot-path
     parsed_packet_t *parsed = malloc(sizeof(parsed_packet_t));
+    parsed->type = PACKET_TYPE_UDP;
     parsed->udp = udp;
-    process_parsed_packet(parsed, PACKET_TYPE_UDP, q);
+    process_parsed_packet(parsed, q);
   }
 }
 
@@ -78,6 +73,7 @@ typedef struct {
 
 typedef struct {
   shared_queue_t *queue;
+  router_t *router;
 } parse_packets_args_t;
 
 void *start_pcap_reader(void *arg) {
@@ -94,7 +90,7 @@ void *start_pcap_reader(void *arg) {
     fprintf(stderr, "Couldn't open file %s: %s\n", filename, errbuf);
   }
 
-  pcap_loop(handle, -1, got_packet, (u_char *)q);
+  pcap_loop(handle, -1, process_raw_packet, (u_char *)q);
 
   pthread_mutex_lock(&q->mutex);
   q->producer_finished = true;
@@ -109,6 +105,7 @@ void *start_pcap_reader(void *arg) {
 void *start_pcap_parser(void *arg) {
   parse_packets_args_t *args = (parse_packets_args_t *)arg;
   shared_queue_t *q = args->queue;
+  router_t *r = args->router;
   free(arg);
 
   while (true) {
@@ -127,18 +124,7 @@ void *start_pcap_parser(void *arg) {
     pthread_mutex_unlock(&q->mutex);
 
     parsed_packet_t *parsed = (parsed_packet_t *)result;
-    switch (parsed->type) {
-    case PACKET_TYPE_TCP:
-      print_tcp(&parsed->tcp);
-      free(parsed->tcp.payload);
-      break;
-    case PACKET_TYPE_UDP:
-      print_udp(&parsed->udp);
-      free(parsed->udp.payload);
-      break;
-    default:
-      printf("Unhandled packet type (%d)", parsed->type);
-    }
+    router_process_packet(r, parsed);
 
     free(parsed);
   }
@@ -146,7 +132,7 @@ void *start_pcap_parser(void *arg) {
   return NULL;
 }
 
-int read_parse_pcap_file(const char *filename) {
+int read_parse_route_pcap_file(const char *filename, router_t *router) {
   pthread_t reader_thread;
   pthread_t parser_thread;
 
@@ -164,6 +150,7 @@ int read_parse_pcap_file(const char *filename) {
 
   parse_packets_args_t *parser_args = malloc(sizeof(parse_packets_args_t));
   parser_args->queue = &q;
+  parser_args->router = router;
 
   if (pthread_create(&reader_thread, NULL, start_pcap_reader, reader_args) !=
       0) {

@@ -2,6 +2,7 @@
 #define INCLUDE_ROUTING_H_
 
 #include "identifiers.h"
+#include "packet.h"
 #include <stddef.h>
 
 typedef struct {
@@ -46,8 +47,10 @@ typedef struct {
 } router_t;
 
 void router_create(router_t *r, ip_address_t ip, subnet_mask_t subnet_mask,
-                   mac_address_t mac, routing_table_entry_t **routing_table);
+                   mac_address_t mac, routing_table_entry_t **routing_table,
+                   size_t routing_table_len);
 int routing_table_create(routing_table_t *rt, routing_table_entry_t **entries,
                          int len);
+int router_process_packet(const router_t *r, const parsed_packet_t *pkt);
 
 #endif // INCLUDE_ROUTING_H_
