@@ -1,7 +1,14 @@
 #include "../include/helper.h"
-#include "../include/parser.h"
 #include <stdint.h>
 #include <stdio.h>
+
+void print_ip(ip_address_t ip) {
+  uint8_t a = ip >> 24;
+  uint8_t b = ip >> 16;
+  uint8_t c = ip >> 8;
+  uint8_t d = ip;
+  printf("%d.%d.%d.%d", a, b, c, d);
+}
 
 void print_mac(const uint8_t mac[6]) {
   printf("%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3],

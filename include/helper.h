@@ -1,10 +1,13 @@
 #ifndef INCLUDE_HELPER_H_
 #define INCLUDE_HELPER_H_
 
+#include "identifiers.h"
 #include "packet.h"
+#include "parser.h"
 #include <stddef.h>
 #include <stdint.h>
 
+void print_ip(ip_address_t ip);
 void print_mac(const uint8_t mac[6]);
 void print_payload(const uint8_t *data, size_t len);
 

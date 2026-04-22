@@ -27,6 +27,11 @@ int router_process_packet(const router_t *r, const parsed_packet_t *pkt) {
   }
 
   printf("Router has routing table len: %zu\n", r->routing_table_len);
+  for (int i = 0; i < r->routing_table_len; i++) {
+    printf("-> Route: ");
+    print_ip(r->routing_table[i]->network);
+    printf(" => %d\n", r->routing_table[i]->target.id);
+  }
 
   return 0;
 }
