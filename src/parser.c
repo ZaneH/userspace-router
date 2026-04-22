@@ -51,6 +51,8 @@ void process_raw_packet(u_char *args, const struct pcap_pkthdr *header,
     parsed_packet_t *parsed = malloc(sizeof(parsed_packet_t));
     parsed->type = PACKET_TYPE_TCP;
     parsed->tcp = tcp;
+    parsed->ip_hdr = ipv4;
+    parsed->eth_frame = ef;
     process_parsed_packet(parsed, q);
   } else if (ipv4.protocol == IPPROTO_UDP) {
     const uint8_t *udp_data = ipv4_data + ipv4.ihl * 4;
@@ -62,6 +64,8 @@ void process_raw_packet(u_char *args, const struct pcap_pkthdr *header,
     parsed_packet_t *parsed = malloc(sizeof(parsed_packet_t));
     parsed->type = PACKET_TYPE_UDP;
     parsed->udp = udp;
+    parsed->ip_hdr = ipv4;
+    parsed->eth_frame = ef;
     process_parsed_packet(parsed, q);
   }
 }

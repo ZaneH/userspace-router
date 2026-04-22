@@ -43,8 +43,12 @@ void print_ipv4(const ipv4_header_t *hdr) {
   printf("TTL: %d\n", hdr->ttl);
   printf("Protocol: %d\n", hdr->protocol);
   printf("Checksum: 0x%x\n", hdr->checksum);
-  printf("Src: 0x%08x\n", hdr->src);
-  printf("Dst: 0x%08x\n", hdr->dst);
+  printf("Src: ");
+  print_ip(hdr->src);
+  printf("\n");
+  printf("Dst: ");
+  print_ip(hdr->dst);
+  printf("\n");
 }
 
 void print_tcp(const tcp_pkt_t *pkt) {

@@ -13,6 +13,8 @@ void router_create(router_t *r, ip_address_t ip, subnet_mask_t subnet_mask,
 }
 
 int router_process_packet(const router_t *r, const parsed_packet_t *pkt) {
+  print_ipv4(&pkt->ip_hdr);
+  print_ethframe(&pkt->eth_frame);
   switch (pkt->type) {
   case PACKET_TYPE_TCP:
     print_tcp(&pkt->tcp);

@@ -62,6 +62,8 @@ typedef enum {
 
 typedef struct {
   packet_type_t type;
+  ipv4_header_t ip_hdr;
+  ethernet_frame_t eth_frame;
   union {
     tcp_pkt_t tcp;
     udp_pkt_t udp;
