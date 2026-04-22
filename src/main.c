@@ -11,9 +11,9 @@ int main(int argc, char *argv[]) {
   // TODO: Create a cleaner interface for configuring a router. Maybe create
   // separate functions for each config.
   router_interface_t my_network_if = {.id = 42};
-  routing_table_entry_t my_network = {.network = ip_from_bytes(10, 0, 0, 0),
+  routing_table_entry_t my_network = {.network = ip_from_bytes(172, 16, 11, 0),
                                       .nw_prefix_len =
-                                          ip_from_bytes(255, 0, 0, 0),
+                                          ip_from_bytes(255, 255, 255, 0),
                                       my_network_if};
   routing_table_entry_t *rt_entries[1] = {&my_network};
 

@@ -1,5 +1,6 @@
 #include "../include/routing.h"
 #include "../include/helper.h"
+#include <stdbool.h>
 #include <stdlib.h>
 
 void router_create(router_t *r, ip_address_t ip, subnet_mask_t subnet_mask,
@@ -12,7 +13,32 @@ void router_create(router_t *r, ip_address_t ip, subnet_mask_t subnet_mask,
   r->routing_table_len = routing_table_len;
 }
 
-int router_process_packet(const router_t *r, const parsed_packet_t *pkt) {
+routing_table_entry_t *lookup_route(ip_address_t dst,
+                                    const routing_table_t table, size_t size) {
+  for (int i = 0; i < size; i++) {
+    ip_address_t masked_dst = dst & table[i]->nw_prefix_len;
+    ip_address_t candidate = table[i]->network & table[i]->nw_prefix_len;
+    if (masked_dst == candidate) {
+      return table[i];
+    }
+  }
+
+  return NULL;
+}
+
+int router_process_packet(const router_t *r, parsed_packet_t *pkt) {
+  routing_table_entry_t *route =
+      lookup_route(pkt->ip_hdr.dst, r->routing_table, r->routing_table_len);
+  if (route != NULL) {
+    printf("Found a valid route for dst: ");
+    print_ip(pkt->ip_hdr.dst);
+    printf(" => ");
+    print_ip(route->network);
+    printf(" on interface (%d)\n", route->target.id);
+    pkt->ip_hdr.ttl--;
+    // TODO: Forward packet
+  }
+
   print_ipv4(&pkt->ip_hdr);
   print_ethframe(&pkt->eth_frame);
   switch (pkt->type) {
@@ -26,13 +52,6 @@ int router_process_packet(const router_t *r, const parsed_packet_t *pkt) {
     break;
   default:
     printf("Unhandled packet type (%d)", pkt->type);
-  }
-
-  printf("Router has routing table len: %zu\n", r->routing_table_len);
-  for (int i = 0; i < r->routing_table_len; i++) {
-    printf("-> Route: ");
-    print_ip(r->routing_table[i]->network);
-    printf(" => %d\n", r->routing_table[i]->target.id);
   }
 
   return 0;
