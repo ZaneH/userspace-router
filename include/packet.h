@@ -50,9 +50,25 @@ typedef struct {
   uint8_t *payload;
 } udp_pkt_t;
 
+typedef struct {
+  // TODO: Implement ICMP packets
+} icmp_pkt_t;
+
 typedef enum {
   PACKET_TYPE_TCP,
   PACKET_TYPE_UDP,
+  PACKET_TYPE_ICMP,
 } packet_type_t;
+
+typedef struct {
+  packet_type_t type;
+  ipv4_header_t ip_hdr;
+  ethernet_frame_t eth_frame;
+  union {
+    tcp_pkt_t tcp;
+    udp_pkt_t udp;
+    icmp_pkt_t icmp;
+  };
+} parsed_packet_t;
 
 #endif // INCLUDE_PACKET_H_
