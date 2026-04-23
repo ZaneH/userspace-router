@@ -1,4 +1,5 @@
 #include "../include/routing.h"
+#include "../include/forwarding.h"
 #include "../include/helper.h"
 #include <stdbool.h>
 #include <stdlib.h>
@@ -35,8 +36,7 @@ int router_process_packet(const router_t *r, parsed_packet_t *pkt) {
     printf(" => ");
     print_ip(route->network);
     printf(" on interface (%d)\n", route->target.id);
-    pkt->ip_hdr.ttl--;
-    // TODO: Forward packet
+    forward_packet(&route->target, pkt);
   }
 
   print_ipv4(&pkt->ip_hdr);

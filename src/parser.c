@@ -7,14 +7,15 @@
 
 int process_parsed_packet(parsed_packet_t *pkt, shared_queue_t *q) {
   pthread_mutex_lock(&q->mutex);
+  ring_buffer_t *rb = &q->rb;
 
-  if (ring_buffer_full(q->rb)) {
-    while (ring_buffer_full(q->rb))
+  if (ring_buffer_full(rb)) {
+    while (ring_buffer_full(rb))
       pthread_cond_wait(&q->has_space, &q->mutex);
   }
 
-  if (!ring_buffer_full(q->rb)) {
-    ring_buffer_push(q->rb, (uintptr_t)pkt);
+  if (!ring_buffer_full(rb)) {
+    ring_buffer_push(rb, (uintptr_t)pkt);
   }
 
   pthread_cond_signal(&q->not_empty);
@@ -110,20 +111,21 @@ void *start_pcap_parser(void *arg) {
   parse_packets_args_t *args = (parse_packets_args_t *)arg;
   shared_queue_t *q = args->queue;
   router_t *r = args->router;
+  ring_buffer_t *rb = &r->read_parse_queue.rb;
   free(arg);
 
   while (true) {
     pthread_mutex_lock(&q->mutex);
-    while (ring_buffer_empty(q->rb) && !q->producer_finished)
+    while (ring_buffer_empty(rb) && !q->producer_finished)
       pthread_cond_wait(&q->not_empty, &q->mutex);
 
-    if (ring_buffer_empty(q->rb) && q->producer_finished) {
+    if (ring_buffer_empty(rb) && q->producer_finished) {
       pthread_mutex_unlock(&q->mutex);
       break;
     }
 
     uintptr_t result;
-    ring_buffer_pop(q->rb, &result);
+    ring_buffer_pop(rb, &result);
     pthread_cond_signal(&q->has_space);
     pthread_mutex_unlock(&q->mutex);
 
@@ -140,43 +142,35 @@ int read_parse_route_pcap_file(const char *filename, router_t *router) {
   pthread_t reader_thread;
   pthread_t parser_thread;
 
-  ring_buffer_t rb;
-  ring_buffer_create(&rb, 10);
-  shared_queue_t q;
-  pthread_mutex_t q_mutex;
-  pthread_cond_t not_empty_cond;
-  pthread_cond_t has_space_cond;
-  shared_queue_create(&q, &rb, &q_mutex, &not_empty_cond, &has_space_cond);
+  shared_queue_create(&router->read_parse_queue, 10);
+  shared_queue_t *q = &router->read_parse_queue;
 
   read_packets_args_t *reader_args = malloc(sizeof(read_packets_args_t));
   reader_args->filename = filename;
-  reader_args->queue = &q;
+  reader_args->queue = q;
 
   parse_packets_args_t *parser_args = malloc(sizeof(parse_packets_args_t));
-  parser_args->queue = &q;
+  parser_args->queue = q;
   parser_args->router = router;
 
   if (pthread_create(&reader_thread, NULL, start_pcap_reader, reader_args) !=
       0) {
     free(reader_args);
-    ring_buffer_destroy(&rb);
-    shared_queue_destroy(&q);
+    shared_queue_destroy(q);
     return 2;
   }
 
   if (pthread_create(&parser_thread, NULL, start_pcap_parser, parser_args) !=
       0) {
     free(parser_args);
-    ring_buffer_destroy(&rb);
-    shared_queue_destroy(&q);
+    shared_queue_destroy(q);
     return 2;
   }
 
   pthread_join(reader_thread, NULL);
   pthread_join(parser_thread, NULL);
 
-  ring_buffer_destroy(&rb);
-  shared_queue_destroy(&q);
+  shared_queue_destroy(q);
 
   return 0;
 }

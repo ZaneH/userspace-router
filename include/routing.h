@@ -3,6 +3,7 @@
 
 #include "identifiers.h"
 #include "packet.h"
+#include "shared_queue.h"
 #include <stddef.h>
 
 typedef struct {
@@ -35,7 +36,7 @@ typedef struct {
   arp_table_entry_t **arp_table;
   size_t arp_table_len;
   /// Known networks to route packets to
-  routing_table_entry_t **routing_table;
+  routing_table_t routing_table;
   size_t routing_table_len;
   /// Packets with destination networks not known to this router are forwarded
   /// to the default route
@@ -44,10 +45,14 @@ typedef struct {
   subnet_mask_t subnet_mask;
   /// Physical address of router
   mac_address_t mac_address;
+  /// FIFO queue for reading/parsing packets
+  shared_queue_t read_parse_queue;
+  /// FIFO queue for forwarding packets
+  shared_queue_t forwarding_queue;
 } router_t;
 
 void router_create(router_t *r, ip_address_t ip, subnet_mask_t subnet_mask,
-                   mac_address_t mac, routing_table_entry_t **routing_table,
+                   mac_address_t mac, routing_table_t routing_table,
                    size_t routing_table_len);
 int routing_table_create(routing_table_t *rt, routing_table_entry_t **entries,
                          int len);
