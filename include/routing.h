@@ -54,8 +54,7 @@ typedef struct {
 void router_create(router_t *r, ip_address_t ip, subnet_mask_t subnet_mask,
                    mac_address_t mac, routing_table_t routing_table,
                    size_t routing_table_len);
-int routing_table_create(routing_table_t *rt, routing_table_entry_t **entries,
-                         int len);
+void router_destroy(router_t *r);
 int router_process_packet(const router_t *r, parsed_packet_t *pkt);
 
 #endif // INCLUDE_ROUTING_H_

@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-int process_parsed_packet(parsed_packet_t *pkt, shared_queue_t *q) {
+int queue_parsed_packet(parsed_packet_t *pkt, shared_queue_t *q) {
   pthread_mutex_lock(&q->mutex);
   ring_buffer_t *rb = &q->rb;
 
@@ -54,7 +54,7 @@ void process_raw_packet(u_char *args, const struct pcap_pkthdr *header,
     parsed->tcp = tcp;
     parsed->ip_hdr = ipv4;
     parsed->eth_frame = ef;
-    process_parsed_packet(parsed, q);
+    queue_parsed_packet(parsed, q);
   } else if (ipv4.protocol == IPPROTO_UDP) {
     const uint8_t *udp_data = ipv4_data + ipv4.ihl * 4;
 
@@ -67,7 +67,7 @@ void process_raw_packet(u_char *args, const struct pcap_pkthdr *header,
     parsed->udp = udp;
     parsed->ip_hdr = ipv4;
     parsed->eth_frame = ef;
-    process_parsed_packet(parsed, q);
+    queue_parsed_packet(parsed, q);
   }
 }
 
@@ -79,7 +79,7 @@ typedef struct {
 typedef struct {
   shared_queue_t *queue;
   router_t *router;
-} parse_packets_args_t;
+} packet_processor_args_t;
 
 void *start_pcap_reader(void *arg) {
   char errbuf[PCAP_ERRBUF_SIZE];
@@ -107,8 +107,8 @@ void *start_pcap_reader(void *arg) {
   return NULL;
 }
 
-void *start_pcap_parser(void *arg) {
-  parse_packets_args_t *args = (parse_packets_args_t *)arg;
+void *start_packet_processor(void *arg) {
+  packet_processor_args_t *args = (packet_processor_args_t *)arg;
   shared_queue_t *q = args->queue;
   router_t *r = args->router;
   ring_buffer_t *rb = &r->read_parse_queue.rb;
@@ -140,37 +140,29 @@ void *start_pcap_parser(void *arg) {
 
 int read_parse_route_pcap_file(const char *filename, router_t *router) {
   pthread_t reader_thread;
-  pthread_t parser_thread;
+  pthread_t processor_thread;
 
-  shared_queue_create(&router->read_parse_queue, 10);
   shared_queue_t *q = &router->read_parse_queue;
 
   read_packets_args_t *reader_args = malloc(sizeof(read_packets_args_t));
   reader_args->filename = filename;
   reader_args->queue = q;
 
-  parse_packets_args_t *parser_args = malloc(sizeof(parse_packets_args_t));
-  parser_args->queue = q;
-  parser_args->router = router;
+  packet_processor_args_t *proc_args = malloc(sizeof(packet_processor_args_t));
+  proc_args->queue = q;
+  proc_args->router = router;
 
   if (pthread_create(&reader_thread, NULL, start_pcap_reader, reader_args) !=
-      0) {
+          0 ||
+      pthread_create(&processor_thread, NULL, start_packet_processor,
+                     proc_args) != 0) {
     free(reader_args);
-    shared_queue_destroy(q);
-    return 2;
-  }
-
-  if (pthread_create(&parser_thread, NULL, start_pcap_parser, parser_args) !=
-      0) {
-    free(parser_args);
-    shared_queue_destroy(q);
+    free(proc_args);
     return 2;
   }
 
   pthread_join(reader_thread, NULL);
-  pthread_join(parser_thread, NULL);
-
-  shared_queue_destroy(q);
+  pthread_join(processor_thread, NULL);
 
   return 0;
 }

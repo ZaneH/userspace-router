@@ -29,5 +29,7 @@ int main(int argc, char *argv[]) {
     return result;
   }
 
+  router_destroy(&router);
+
   return 0;
 }

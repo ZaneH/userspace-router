@@ -12,6 +12,14 @@ void router_create(router_t *r, ip_address_t ip, subnet_mask_t subnet_mask,
   r->mac_address = mac;
   r->routing_table = routing_table;
   r->routing_table_len = routing_table_len;
+
+  shared_queue_create(&r->read_parse_queue, 10);
+  shared_queue_create(&r->forwarding_queue, 10);
+}
+
+void router_destroy(router_t *r) {
+  shared_queue_destroy(&r->read_parse_queue);
+  shared_queue_destroy(&r->forwarding_queue);
 }
 
 routing_table_entry_t *lookup_route(ip_address_t dst,
