@@ -1,7 +1,14 @@
 #include "../include/helper.h"
-#include "../include/parser.h"
 #include <stdint.h>
 #include <stdio.h>
+
+void print_ip(ip_address_t ip) {
+  uint8_t a = ip >> 24;
+  uint8_t b = ip >> 16;
+  uint8_t c = ip >> 8;
+  uint8_t d = ip;
+  printf("%d.%d.%d.%d", a, b, c, d);
+}
 
 void print_mac(const uint8_t mac[6]) {
   printf("%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3],
@@ -36,8 +43,12 @@ void print_ipv4(const ipv4_header_t *hdr) {
   printf("TTL: %d\n", hdr->ttl);
   printf("Protocol: %d\n", hdr->protocol);
   printf("Checksum: 0x%x\n", hdr->checksum);
-  printf("Src: 0x%08x\n", hdr->src);
-  printf("Dst: 0x%08x\n", hdr->dst);
+  printf("Src: ");
+  print_ip(hdr->src);
+  printf("\n");
+  printf("Dst: ");
+  print_ip(hdr->dst);
+  printf("\n");
 }
 
 void print_tcp(const tcp_pkt_t *pkt) {

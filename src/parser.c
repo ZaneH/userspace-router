@@ -1,16 +1,31 @@
 #include "../include/parser.h"
-#include "../include/helper.h"
-#include "../include/packet.h"
-#include "../include/ring_buffer.h"
-#include "../include/shared_queue.h"
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
-void got_packet(u_char *args, const struct pcap_pkthdr *header,
-                const u_char *packet) {
+int queue_parsed_packet(parsed_packet_t *pkt, shared_queue_t *q) {
+  pthread_mutex_lock(&q->mutex);
+  ring_buffer_t *rb = &q->rb;
+
+  if (ring_buffer_full(rb)) {
+    while (ring_buffer_full(rb))
+      pthread_cond_wait(&q->has_space, &q->mutex);
+  }
+
+  if (!ring_buffer_full(rb)) {
+    ring_buffer_push(rb, (uintptr_t)pkt);
+  }
+
+  pthread_cond_signal(&q->not_empty);
+  pthread_mutex_unlock(&q->mutex);
+
+  return 0;
+}
+
+void process_raw_packet(u_char *args, const struct pcap_pkthdr *header,
+                        const u_char *packet) {
   printf("Read a packet with length of [%d]\n", header->len);
   shared_queue_t *q = (shared_queue_t *)args;
 
@@ -37,20 +52,9 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
     parsed_packet_t *parsed = malloc(sizeof(parsed_packet_t));
     parsed->type = PACKET_TYPE_TCP;
     parsed->tcp = tcp;
-
-    pthread_mutex_lock(&q->mutex);
-
-    if (ring_buffer_full(q->rb)) {
-      while (ring_buffer_full(q->rb))
-        pthread_cond_wait(&q->has_space, &q->mutex);
-    }
-
-    if (!ring_buffer_full(q->rb)) {
-      ring_buffer_push(q->rb, (uintptr_t)parsed);
-    }
-
-    pthread_cond_signal(&q->not_empty);
-    pthread_mutex_unlock(&q->mutex);
+    parsed->ip_hdr = ipv4;
+    parsed->eth_frame = ef;
+    queue_parsed_packet(parsed, q);
   } else if (ipv4.protocol == IPPROTO_UDP) {
     const uint8_t *udp_data = ipv4_data + ipv4.ihl * 4;
 
@@ -61,20 +65,9 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
     parsed_packet_t *parsed = malloc(sizeof(parsed_packet_t));
     parsed->type = PACKET_TYPE_UDP;
     parsed->udp = udp;
-
-    pthread_mutex_lock(&q->mutex);
-
-    if (ring_buffer_full(q->rb)) {
-      while (ring_buffer_full(q->rb))
-        pthread_cond_wait(&q->has_space, &q->mutex);
-    }
-
-    if (!ring_buffer_full(q->rb)) {
-      ring_buffer_push(q->rb, (uintptr_t)parsed);
-    }
-
-    pthread_cond_signal(&q->not_empty);
-    pthread_mutex_unlock(&q->mutex);
+    parsed->ip_hdr = ipv4;
+    parsed->eth_frame = ef;
+    queue_parsed_packet(parsed, q);
   }
 }
 
@@ -85,7 +78,8 @@ typedef struct {
 
 typedef struct {
   shared_queue_t *queue;
-} parse_packets_args_t;
+  router_t *router;
+} packet_processor_args_t;
 
 void *start_pcap_reader(void *arg) {
   char errbuf[PCAP_ERRBUF_SIZE];
@@ -101,7 +95,7 @@ void *start_pcap_reader(void *arg) {
     fprintf(stderr, "Couldn't open file %s: %s\n", filename, errbuf);
   }
 
-  pcap_loop(handle, -1, got_packet, (u_char *)q);
+  pcap_loop(handle, -1, process_raw_packet, (u_char *)q);
 
   pthread_mutex_lock(&q->mutex);
   q->producer_finished = true;
@@ -113,37 +107,30 @@ void *start_pcap_reader(void *arg) {
   return NULL;
 }
 
-void *start_pcap_parser(void *arg) {
-  parse_packets_args_t *args = (parse_packets_args_t *)arg;
+void *start_packet_processor(void *arg) {
+  packet_processor_args_t *args = (packet_processor_args_t *)arg;
   shared_queue_t *q = args->queue;
+  router_t *r = args->router;
+  ring_buffer_t *rb = &r->read_parse_queue.rb;
   free(arg);
 
   while (true) {
     pthread_mutex_lock(&q->mutex);
-    while (ring_buffer_empty(q->rb) && !q->producer_finished)
+    while (ring_buffer_empty(rb) && !q->producer_finished)
       pthread_cond_wait(&q->not_empty, &q->mutex);
 
-    if (ring_buffer_empty(q->rb) && q->producer_finished) {
+    if (ring_buffer_empty(rb) && q->producer_finished) {
       pthread_mutex_unlock(&q->mutex);
       break;
     }
 
     uintptr_t result;
-    ring_buffer_pop(q->rb, &result);
+    ring_buffer_pop(rb, &result);
     pthread_cond_signal(&q->has_space);
     pthread_mutex_unlock(&q->mutex);
 
     parsed_packet_t *parsed = (parsed_packet_t *)result;
-    switch (parsed->type) {
-    case PACKET_TYPE_TCP:
-      print_tcp(&parsed->tcp);
-      free(parsed->tcp.payload);
-      break;
-    case PACKET_TYPE_UDP:
-      print_udp(&parsed->udp);
-      free(parsed->udp.payload);
-      break;
-    }
+    router_process_packet(r, parsed);
 
     free(parsed);
   }
@@ -151,46 +138,31 @@ void *start_pcap_parser(void *arg) {
   return NULL;
 }
 
-int read_parse_pcap_file(const char *filename) {
+int read_parse_route_pcap_file(const char *filename, router_t *router) {
   pthread_t reader_thread;
-  pthread_t parser_thread;
+  pthread_t processor_thread;
 
-  ring_buffer_t rb;
-  ring_buffer_create(&rb, 10);
-  shared_queue_t q;
-  pthread_mutex_t q_mutex;
-  pthread_cond_t not_empty_cond;
-  pthread_cond_t has_space_cond;
-  shared_queue_create(&q, &rb, &q_mutex, &not_empty_cond, &has_space_cond);
+  shared_queue_t *q = &router->read_parse_queue;
 
   read_packets_args_t *reader_args = malloc(sizeof(read_packets_args_t));
   reader_args->filename = filename;
-  reader_args->queue = &q;
+  reader_args->queue = q;
 
-  parse_packets_args_t *parser_args = malloc(sizeof(parse_packets_args_t));
-  parser_args->queue = &q;
+  packet_processor_args_t *proc_args = malloc(sizeof(packet_processor_args_t));
+  proc_args->queue = q;
+  proc_args->router = router;
 
   if (pthread_create(&reader_thread, NULL, start_pcap_reader, reader_args) !=
-      0) {
+          0 ||
+      pthread_create(&processor_thread, NULL, start_packet_processor,
+                     proc_args) != 0) {
     free(reader_args);
-    ring_buffer_destroy(&rb);
-    shared_queue_destroy(&q);
-    return 2;
-  }
-
-  if (pthread_create(&parser_thread, NULL, start_pcap_parser, parser_args) !=
-      0) {
-    free(parser_args);
-    ring_buffer_destroy(&rb);
-    shared_queue_destroy(&q);
+    free(proc_args);
     return 2;
   }
 
   pthread_join(reader_thread, NULL);
-  pthread_join(parser_thread, NULL);
-
-  ring_buffer_destroy(&rb);
-  shared_queue_destroy(&q);
+  pthread_join(processor_thread, NULL);
 
   return 0;
 }
